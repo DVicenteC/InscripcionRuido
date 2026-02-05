@@ -1,18 +1,19 @@
 /**
- * Script de Google Apps Script para gestionar inscripciones a cursos TMERT
+ * Script de Google Apps Script para gestionar inscripciones a cursos
+ * PROTOCOLO DE EVALUACIÓN DE RUIDO
  * Y REGISTRO DE ASISTENCIAS
  * Este script se debe copiar en el Editor de secuencias de comandos
  * de tu hoja de cálculo de Google Sheets
  */
 
-// ID de la hoja de cálculo (no necesitas modificarlo si ejecutas el script desde la hoja)
-const SPREADSHEET_ID = '1U64j95_UPpKH1gZvjB11YhFypcpKJQX8P320KhIK6js';
+// ID de la hoja de cálculo - Protocolo Evaluación Ruido
+const SPREADSHEET_ID = '108-ip-NR-QLObfO3iWU6VTsUK-ShfAPqYJL0NNMF7NU';
 
 // Nombres de las hojas
-const REGISTROS_SHEET_NAME = 'Hoja 1';
+const REGISTROS_SHEET_NAME = 'Inscripciones';
 const CONFIG_SHEET_NAME = 'Config';
 const SHEET_NAME_ASISTENCIAS = 'Asistencias';
-const API_KEY = 'tu_clave_secretaISTColon3066'; // Cámbiala por una clave segura
+const API_KEY = 'ruido_2026_clave_segura_IST'; // Clave específica para Ruido
 
 // Función para configurar el servicio web
 // Función para recibir solicitudes GET
@@ -193,7 +194,7 @@ function getConfigData() {
       configSheet = ss.getSheetByName(CONFIG_SHEET_NAME);
       if (!configSheet) {
         configSheet = ss.insertSheet(CONFIG_SHEET_NAME);
-        configSheet.appendRow(['curso_id', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']);
+        configSheet.appendRow(['curso_id', 'region', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_jornada']);
       }
     } catch (error) {
       configSheet = ss.insertSheet(CONFIG_SHEET_NAME);
@@ -236,7 +237,7 @@ function getRegistrosData() {
     if (headers.length === 0 || headers[0] === '') {
       sheet.appendRow([
         'fecha_registro', 'curso_id', 'rut', 'nombres', 'apellido_paterno',
-        'apellido_materno', 'nacionalidad', 'email', 'gmail', 'sexo', 'rol', 'rut_empresa',
+        'apellido_materno', 'nacionalidad', 'email', 'sexo', 'rol', 'rut_empresa',
         'razon_social', 'region', 'comuna', 'direccion'
       ]);
     }
@@ -276,7 +277,7 @@ function addRegistro(data) {
     if (sheet.getLastRow() === 0) {
       sheet.appendRow([
         'fecha_registro', 'curso_id', 'rut', 'nombres', 'apellido_paterno',
-        'apellido_materno', 'nacionalidad', 'email', 'gmail', 'sexo', 'rol', 'rut_empresa',
+        'apellido_materno', 'nacionalidad', 'email', 'sexo', 'rol', 'rut_empresa',
         'razon_social', 'region', 'comuna', 'direccion'
       ]);
     }
@@ -313,7 +314,6 @@ function addRegistro(data) {
       data.apellido_materno,
       data.nacionalidad,
       data.email,
-      data.gmail,
       data.sexo,
       data.rol,
       data.rut_empresa,
@@ -346,11 +346,11 @@ function addCurso(data) {
       if (!configSheet) {
         configSheet = ss.insertSheet(CONFIG_SHEET_NAME);
         // IMPORTANTE: Estructura con región y columnas de sesiones
-        configSheet.appendRow(['curso_id', 'region', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']);
+        configSheet.appendRow(['curso_id', 'region', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_jornada']);
       }
     } catch (error) {
       configSheet = ss.insertSheet(CONFIG_SHEET_NAME);
-      configSheet.appendRow(['curso_id', 'region', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']);
+      configSheet.appendRow(['curso_id', 'region', 'fecha_inicio', 'fecha_fin', 'estado', 'cupo_maximo', 'fecha_jornada']);
     }
 
     // Establecer todos los cursos como inactivos
@@ -368,9 +368,7 @@ function addCurso(data) {
       data.fecha_fin,
       'ACTIVO',
       data.cupo_maximo,
-      data.fecha_sesion_1 || '',
-      data.fecha_sesion_2 || '',
-      data.fecha_sesion_3 || ''
+      data.fecha_jornada || ''
     ]);
 
     return {
@@ -500,9 +498,7 @@ function updateConfig(data) {
         curso.fecha_fin,
         curso.estado,
         curso.cupo_maximo,
-        curso.fecha_sesion_1 || '',
-        curso.fecha_sesion_2 || '',
-        curso.fecha_sesion_3 || ''
+        curso.fecha_jornada || ''
       ]);
     }
 
@@ -718,7 +714,6 @@ function testAddRegistro() {
     apellido_materno: "MATERNO TEST",
     nacionalidad: "TEST",
     email: "test@example.com",
-    gmail: "test@gmail.com",
     sexo: "Hombre",
     rol: "TEST",
     rut_empresa: "TEST-EMPRESA",

@@ -40,7 +40,7 @@ def get_config_data():
             df = pd.DataFrame(data['cursos'])
             if not df.empty:
                 # Convertir columnas de fecha a datetime (probando múltiples formatos)
-                date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
+                date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada']
                 for col in date_cols:
                     if col in df.columns:
                         # Intentar parsear sin formato específico (pandas detecta automáticamente)
@@ -302,11 +302,9 @@ try:
         fecha_inicio = st.sidebar.date_input("Fecha de Inicio")
         fecha_fin = st.sidebar.date_input("Fecha de Término")
 
-        # Fechas de sesiones
-        st.sidebar.write("**Fechas de Sesiones:**")
-        fecha_sesion_1 = st.sidebar.date_input("Fecha Sesión 1")
-        fecha_sesion_2 = st.sidebar.date_input("Fecha Sesión 2")
-        fecha_sesion_3 = st.sidebar.date_input("Fecha Sesión 3")
+        # Fecha de la jornada única
+        fecha_jornada = st.sidebar.date_input("Fecha de la Jornada (*)",
+                                              help="Fecha en que se realizará la jornada de 90-120 minutos")
 
         # Generar ID automáticamente en formato: CódigoRegión-MesAño
         meses_esp = {
@@ -332,8 +330,8 @@ try:
             # Validaciones
             if not curso_id:
                 st.sidebar.error("⚠️ Debe ingresar un ID para el curso")
-            elif fecha_fin <= fecha_inicio:
-                st.sidebar.error("⚠️ La fecha de término debe ser posterior a la fecha de inicio")
+            elif fecha_fin < fecha_inicio:
+                st.sidebar.error("⚠️ La fecha de término no puede ser anterior a la fecha de inicio")
             else:
                 # Crear objeto de curso con región
                 nuevo_curso = {
@@ -341,9 +339,7 @@ try:
                     'region': region_curso,
                     'fecha_inicio': fecha_inicio.strftime('%d-%m-%Y'),
                     'fecha_fin': fecha_fin.strftime('%d-%m-%Y'),
-                    'fecha_sesion_1': fecha_sesion_1.strftime('%d-%m-%Y'),
-                    'fecha_sesion_2': fecha_sesion_2.strftime('%d-%m-%Y'),
-                    'fecha_sesion_3': fecha_sesion_3.strftime('%d-%m-%Y'),
+                    'fecha_jornada': fecha_jornada.strftime('%d-%m-%Y'),
                     'cupo_maximo': int(cupo_maximo),
                     'estado': 'ACTIVO'
                 }
@@ -414,7 +410,7 @@ try:
 
     # Mostrar formulario de inscripción
     try:
-        st.title("Inscripción Curso de 20 horas Protocolo VOTME para Profesionales SST Implementadores - Empresas Adherentes de IST")
+        st.title("Inscripción Jornada de Difusión sobre el Nuevo Protocolo de Ruido ISP (Res. Ex. Nº 5.921) - Empresas Adherentes de IST")
 
         # Obtener todos los cursos
         df_cursos = get_config_data()
@@ -553,7 +549,6 @@ try:
                     nombres = st.text_input("Nombres (*)").upper()
                     apellido_paterno = st.text_input("Apellido Paterno (*)").upper()
                     email = st.text_input("Correo Electrónico (*)", help="ejemplo@dominio.com")
-                    gmail = st.text_input("Correo Gmail (*)", help="ejemplo@gmail.com")
                     
                 with col2:
                     sexo = st.selectbox("Sexo (*)", SEXO).upper()
@@ -581,7 +576,7 @@ try:
 
                     if cupos_disponibles <= 0:
                         st.error("Lo sentimos, mientras se procesaba su solicitud se agotaron los cupos disponibles.")
-                    elif not all([rut, nombres, apellido_paterno, nacionalidad, email, gmail,
+                    elif not all([rut, nombres, apellido_paterno, nacionalidad, email,
                                  rut_empresa, razon_social, region, comuna, direccion]):
                         st.error("Complete todos los campos obligatorios")
                     elif not rut_chile.is_valid_rut(rut):
@@ -590,8 +585,6 @@ try:
                         st.error("RUT empresa inválido")
                     elif '@' not in email or '.' not in email:
                         st.error("Correo electrónico inválido")
-                    #elif '@gmail.com' not in gmail.lower():
-                    #    st.error("Debe ingresar un correo Gmail válido")
                     else:    
                         # Preparar nuevo registro
                         nuevo_registro = {
@@ -603,7 +596,6 @@ try:
                             'apellido_materno': apellido_materno,
                             'nacionalidad': nacionalidad,
                             'email': email,
-                            'gmail': gmail,
                             'sexo': sexo,
                             'rol': rol,
                             'rut_empresa': rut_empresa,
@@ -620,30 +612,6 @@ try:
                             st.balloons()
                             time.sleep(2)
                             st.rerun()
-            
-            # Botón para ver inscritos
-            if st.button("Ver inscritos"):
-                df_registros = get_registros_data()
-                if not df_registros.empty:
-                    registros_curso = df_registros[df_registros['curso_id'] == curso_actual['curso_id']]
-
-                    if not registros_curso.empty:
-                        # Mostrar métricas de cupos en la parte superior
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Cupo Máximo", curso_actual['cupo_maximo'])
-                        with col2:
-                            st.metric("Inscritos", len(registros_curso))
-                        with col3:
-                            st.metric("Cupos Disponibles", int(curso_actual['cupo_maximo']) - len(registros_curso))
-
-                        # Mostrar la tabla de inscritos
-                        st.write("### Lista de Inscritos")
-                        st.write(registros_curso)
-                    else:
-                        st.info("Aún no hay inscritos en este curso")
-                else:
-                    st.info("Aún no hay inscritos en este curso")
 
     except Exception as e:
         st.error(f"Error al cargar cursos: {str(e)}")
