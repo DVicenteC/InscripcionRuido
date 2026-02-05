@@ -32,6 +32,19 @@ streamlit run AsistenciaCurso.py
 
 ---
 
+## 🔒 Archivos Sensibles (NO están en GitHub)
+
+**IMPORTANTE:** Los siguientes archivos contienen información sensible y están excluidos del repositorio:
+
+- `Codigo_ACTUALIZADO.gs` - Contiene SPREADSHEET_ID y API_KEY reales
+- `.streamlit/secrets.toml` - Credenciales y URLs de deployment
+- `.claude/` - Configuración local de desarrollo
+- `__pycache__/` - Caché de Python
+
+**Para nuevos colaboradores:** Usa `Codigo_ACTUALIZADO.template.gs` como base y completa con tus propios valores.
+
+---
+
 ## 📦 Configuración Inicial REQUERIDA
 
 ### **1. Crear Nuevo Google Sheet**
