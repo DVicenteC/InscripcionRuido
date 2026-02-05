@@ -205,41 +205,49 @@ def main():
     # Obtener instancia del buffer
     buffer = get_buffer()
 
-    # ==================== SIDEBAR CON ESTADÍSTICAS ====================
+    # ==================== SIDEBAR CON AUTENTICACIÓN ====================
 
     st.sidebar.title("🔐 Panel de Control")
 
-    # Mostrar estadísticas del buffer
-    st.sidebar.subheader("📊 Estado del Buffer")
-    stats = buffer.get_estadisticas()
+    # Autenticación admin
+    password = st.sidebar.text_input("Contraseña Admin", type="password", key="admin_password")
+    admin_mode = password == SECRET_PASSWORD
 
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.metric("Total", stats['total'])
-        st.metric("Sincronizadas", stats['sincronizadas'])
-    with col2:
-        st.metric("Pendientes", stats['pendientes'])
-        st.metric("Fallidas", stats['fallidas'])
+    if admin_mode:
+        st.sidebar.success("✅ Acceso Admin")
 
-    # Botón para forzar sincronización
-    if st.sidebar.button("🔄 Sincronizar Ahora"):
-        with st.spinner("Sincronizando con Google Sheets..."):
-            resultado = buffer.sincronizar(batch_size=100)
+        # Mostrar estadísticas del buffer (solo para admin)
+        st.sidebar.divider()
+        st.sidebar.subheader("📊 Estado del Buffer")
+        stats = buffer.get_estadisticas()
 
-        st.sidebar.success(f"✅ Sincronizados: {resultado['sincronizados']}")
-        if resultado['fallidos'] > 0:
-            st.sidebar.warning(f"⚠️ Fallidos: {resultado['fallidos']}")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            st.metric("Total", stats['total'])
+            st.metric("Sincronizadas", stats['sincronizadas'])
+        with col2:
+            st.metric("Pendientes", stats['pendientes'])
+            st.metric("Fallidas", stats['fallidas'])
 
-    # Botón para limpiar cache
-    if st.sidebar.button("🗑️ Limpiar Sincronizados"):
-        eliminados = buffer.limpiar_sincronizados(dias=1)
-        st.sidebar.success(f"✅ Eliminados: {eliminados} registros")
+        st.sidebar.divider()
+
+        # Botones de control (solo para admin)
+        if st.sidebar.button("🔄 Sincronizar Ahora"):
+            with st.spinner("Sincronizando con Google Sheets..."):
+                resultado = buffer.sincronizar(batch_size=300)  # Aumentado a 300
+
+            st.sidebar.success(f"✅ Sincronizados: {resultado['sincronizados']}")
+            if resultado['fallidos'] > 0:
+                st.sidebar.warning(f"⚠️ Fallidos: {resultado['fallidos']}")
+
+        if st.sidebar.button("🗑️ Limpiar Sincronizados"):
+            eliminados = buffer.limpiar_sincronizados(dias=1)
+            st.sidebar.success(f"✅ Eliminados: {eliminados} registros")
+    else:
+        if password:
+            st.sidebar.error("❌ Contraseña incorrecta")
 
     st.sidebar.divider()
-
-    # Panel administrativo
-    password = st.sidebar.text_input("Contraseña Admin", type="password")
-    admin_mode = password == SECRET_PASSWORD
 
     # ==================== MODO PARTICIPANTE (SIN PASSWORD) ====================
 

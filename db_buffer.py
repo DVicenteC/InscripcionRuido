@@ -176,12 +176,12 @@ class AsistenciaBuffer:
 
         return [dict(zip(columns, row)) for row in result]
 
-    def sincronizar(self, batch_size=50):
+    def sincronizar(self, batch_size=300):
         """
         Sincroniza asistencias pendientes con Google Sheets en lotes.
 
         Args:
-            batch_size: Tamaño del lote (default: 50)
+            batch_size: Tamaño del lote (default: 300, optimizado para 600+ usuarios)
 
         Returns:
             dict: Estadísticas de sincronización
