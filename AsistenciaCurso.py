@@ -200,7 +200,7 @@ def validar_participante_inscrito(rut, curso_id, df_registros):
 # ==================== INTERFAZ PRINCIPAL ====================
 
 def main():
-    st.title("📋 Sistema de Registro de Asistencia (Con Buffer)")
+    st.title("📋 Registro de Asistencia - Jornada de Difusión sobre el Nuevo Protocolo de Ruido ISP (Res. Ex. Nº 5.921) - Empresas Adherentes de IST")
 
     # Obtener instancia del buffer
     buffer = get_buffer()
