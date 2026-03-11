@@ -29,7 +29,7 @@ import io
 from db_buffer import get_buffer
 
 # Configuración básica
-st.set_page_config(page_title="Registro de Asistencia", layout="wide")
+st.set_page_config(page_title="Registro de Asistencia", layout="wide", initial_sidebar_state="collapsed")
 
 # Constantes
 SECRET_PASSWORD = st.secrets["SECRET_PASSWORD"]
@@ -52,7 +52,9 @@ def get_config_data():
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
-                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        df[col] = (pd.to_datetime(df[col], utc=True, errors='coerce')
+                                   .dt.tz_convert(None)
+                                   .dt.normalize())
 
                 df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')
             return df
@@ -186,9 +188,10 @@ def validar_participante_inscrito(rut, curso_id, df_registros):
     if df_registros.empty:
         return False, None
 
-    # Buscar participante en el curso
+    # Buscar participante — comparación case-insensitive (ej: 12345678-k == 12345678-K)
+    rut_norm = str(rut).upper().strip()
     participante = df_registros[
-        (df_registros['rut'] == rut) &
+        (df_registros['rut'].astype(str).str.upper().str.strip() == rut_norm) &
         (df_registros['curso_id'] == curso_id)
     ]
 
@@ -241,8 +244,14 @@ def main():
                 st.sidebar.warning(f"⚠️ Fallidos: {resultado['fallidos']}")
 
         if st.sidebar.button("🗑️ Limpiar Sincronizados"):
-            eliminados = buffer.limpiar_sincronizados(dias=1)
+            eliminados = buffer.limpiar_sincronizados(dias=0)
             st.sidebar.success(f"✅ Eliminados: {eliminados} registros")
+
+        if st.sidebar.button("🚨 Borrar Todo el Buffer", type="primary"):
+            buffer.conn.execute("DELETE FROM asistencias_buffer")
+            buffer.hydrate_from_sheets()
+            st.sidebar.success("✅ Buffer vaciado y recargado desde Sheets")
+            st.rerun()
     else:
         if password:
             st.sidebar.error("❌ Contraseña incorrecta")
@@ -265,14 +274,14 @@ def main():
         # Mostrar cursos disponibles
         st.subheader("📅 Cursos con Sesión Hoy")
 
-        for _, curso in df_cursos_hoy.iterrows():
-            with st.expander(f"📚 {curso['curso_id']} - Sesión {curso['sesion_hoy']}"):
-                st.write(f"**Región:** {curso.get('region', 'N/A')}")
-                st.write(f"**Fecha:** {curso['fecha_sesion_hoy'].strftime('%d-%m-%Y')}")
-                st.write(f"**Sesión:** {curso['sesion_hoy']} de 3")
+        @st.fragment
+        def formulario_asistencia(curso_id, sesion_hoy, region, fecha_str):
+            with st.expander(f"📚 {curso_id} - Sesión {sesion_hoy}", expanded=True):
+                st.write(f"**Región:** {region}")
+                st.write(f"**Fecha:** {fecha_str}")
+                st.write(f"**Sesión:** {sesion_hoy} de 3")
 
-                # Formulario para marcar asistencia
-                with st.form(key=f"form_{curso['curso_id']}_{curso['sesion_hoy']}"):
+                with st.form(key=f"form_{curso_id}_{sesion_hoy}", clear_on_submit=True):
                     rut_input = st.text_input(
                         "Ingresa tu RUT (sin puntos, con guión)",
                         placeholder="12345678-9"
@@ -281,41 +290,46 @@ def main():
                     submit = st.form_submit_button("✅ Marcar Asistencia")
 
                     if submit and rut_input:
-                        # Validar RUT
+                        rut_input = rut_input.strip().upper()
+
                         if not rut_chile.is_valid_rut(rut_input):
                             st.error("❌ RUT inválido. Verifica el formato.")
                         else:
-                            # Verificar inscripción
                             df_registros = get_registros_data()
                             esta_inscrito, datos = validar_participante_inscrito(
-                                rut_input,
-                                curso['curso_id'],
-                                df_registros
+                                rut_input, curso_id, df_registros
                             )
 
                             if not esta_inscrito:
                                 st.error("❌ No estás inscrito en este curso. Contacta al administrador.")
                             else:
-                                # Marcar asistencia en BUFFER (instantáneo)
                                 resultado = guardar_asistencia_buffer(
-                                    curso_id=curso['curso_id'],
+                                    curso_id=curso_id,
                                     rut=rut_input,
-                                    sesion=curso['sesion_hoy']
+                                    sesion=sesion_hoy
                                 )
 
                                 if resultado['success']:
-                                    st.success(f"✅ ¡Asistencia registrada para {datos['nombre']}!")
-                                    st.info("📤 Tu asistencia se sincronizará automáticamente con Google Sheets en los próximos 60 segundos.")
+                                    nombre_completo = f"{datos.get('nombres', '')} {datos.get('apellido_paterno', '')}".strip() or rut_input
+                                    st.success(f"✅ ¡Asistencia registrada para {nombre_completo}!")
+                                    st.info("🎉 Ya puedes cerrar esta pestaña.")
+                                    st.balloons()
                                 else:
                                     st.warning(f"ℹ️ {resultado['message']}")
+
+        for _, curso in df_cursos_hoy.iterrows():
+            formulario_asistencia(
+                curso_id=curso['curso_id'],
+                sesion_hoy=curso['sesion_hoy'],
+                region=curso.get('region', 'N/A'),
+                fecha_str=curso['fecha_sesion_hoy'].strftime('%d-%m-%Y')
+            )
 
         st.stop()
 
     # ==================== MODO ADMIN ====================
 
     if admin_mode:
-        st.sidebar.success("✅ Acceso administrativo concedido")
-
         # Tabs para diferentes funciones
         tab1, tab2, tab3 = st.tabs(["📝 Gestionar Asistencia", "📊 Ver Asistencias", "🔧 Mantenimiento"])
 
@@ -381,7 +395,8 @@ def main():
                                     )
 
                                     if resultado['success']:
-                                        st.success(f"✅ Asistencia registrada para {datos['nombre']}")
+                                        nombre_completo = f"{datos.get('nombres', '')} {datos.get('apellido_paterno', '')}".strip() or rut
+                                        st.success(f"✅ Asistencia registrada para {nombre_completo}")
                                     else:
                                         st.error(f"❌ {resultado['message']}")
 
