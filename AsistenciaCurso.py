@@ -381,6 +381,11 @@ def main():
                 for i in [1, 2, 3]:
                     if f'fecha_sesion_{i}' in curso and pd.notna(curso[f'fecha_sesion_{i}']):
                         sesiones.append(i)
+                # Fallback: fecha_jornada o fecha_inicio cuentan como sesión 1
+                if not sesiones:
+                    if ('fecha_jornada' in curso and pd.notna(curso['fecha_jornada'])) or \
+                       ('fecha_inicio' in curso and pd.notna(curso['fecha_inicio'])):
+                        sesiones = [1]
 
                 if not sesiones:
                     st.warning("⚠️ Este curso no tiene sesiones configuradas")
