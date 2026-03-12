@@ -155,27 +155,39 @@ def get_cursos_con_sesion_hoy(df_cursos):
 
     for _, curso in df_cursos.iterrows():
         encontrado = False
-        # Verificar fecha_jornada (cursos de sesión única)
-        if not encontrado and 'fecha_jornada' in curso and pd.notna(curso['fecha_jornada']):
-            fecha_sesion = pd.to_datetime(curso['fecha_jornada']).normalize()
-            if fecha_sesion == hoy:
+
+        # 1. Verificar fecha_jornada (sesión única explícita)
+        if 'fecha_jornada' in curso and pd.notna(curso['fecha_jornada']):
+            if pd.to_datetime(curso['fecha_jornada']).normalize() == hoy:
                 curso_dict = curso.to_dict()
                 curso_dict['sesion_hoy'] = 1
                 curso_dict['fecha_sesion_hoy'] = curso['fecha_jornada']
                 cursos_hoy.append(curso_dict)
                 encontrado = True
-        # Verificar fecha_sesion_1/2/3 (cursos multi-sesión)
+
+        # 2. Verificar fecha_sesion_1/2/3 (cursos multi-sesión)
         if not encontrado:
             for sesion_num in [1, 2, 3]:
                 fecha_col = f'fecha_sesion_{sesion_num}'
                 if fecha_col in curso and pd.notna(curso[fecha_col]):
-                    fecha_sesion = pd.to_datetime(curso[fecha_col]).normalize()
-                    if fecha_sesion == hoy:
+                    if pd.to_datetime(curso[fecha_col]).normalize() == hoy:
                         curso_dict = curso.to_dict()
                         curso_dict['sesion_hoy'] = sesion_num
                         curso_dict['fecha_sesion_hoy'] = curso[fecha_col]
                         cursos_hoy.append(curso_dict)
+                        encontrado = True
                         break
+
+        # 3. Fallback: hoy está dentro del rango fecha_inicio – fecha_fin
+        if not encontrado:
+            inicio = curso.get('fecha_inicio')
+            fin = curso.get('fecha_fin')
+            if pd.notna(inicio) and pd.notna(fin):
+                if pd.to_datetime(inicio).normalize() <= hoy <= pd.to_datetime(fin).normalize():
+                    curso_dict = curso.to_dict()
+                    curso_dict['sesion_hoy'] = 1
+                    curso_dict['fecha_sesion_hoy'] = inicio
+                    cursos_hoy.append(curso_dict)
 
     if cursos_hoy:
         return pd.DataFrame(cursos_hoy)
