@@ -304,10 +304,9 @@ def main():
 
         @st.fragment
         def formulario_asistencia(curso_id, sesion_hoy, region, fecha_str):
-            with st.expander(f"📚 {curso_id} - Sesión {sesion_hoy}", expanded=True):
+            with st.expander(f"📚 {curso_id}", expanded=True):
                 st.write(f"**Región:** {region}")
                 st.write(f"**Fecha:** {fecha_str}")
-                st.write(f"**Sesión:** {sesion_hoy} de 3")
 
                 with st.form(key=f"form_{curso_id}_{sesion_hoy}", clear_on_submit=True):
                     rut_input = st.text_input(
