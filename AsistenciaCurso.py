@@ -52,11 +52,8 @@ def get_config_data():
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
-                        parsed = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
-                        # Eliminar timezone si existe (API puede devolver ISO con tz)
-                        if parsed.dt.tz is not None:
-                            parsed = parsed.dt.tz_localize(None)
-                        df[col] = parsed.dt.normalize()
+                        parsed = pd.to_datetime(df[col], utc=True, errors='coerce')
+                        df[col] = parsed.dt.tz_convert(None).dt.normalize()
 
                 df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')
             return df
