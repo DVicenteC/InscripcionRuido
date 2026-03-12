@@ -43,8 +43,7 @@ def get_config_data():
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada']
                 for col in date_cols:
                     if col in df.columns:
-                        # Intentar parsear sin formato específico (pandas detecta automáticamente)
-                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
 
                 if 'cupo_maximo' in df.columns:
                     df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')

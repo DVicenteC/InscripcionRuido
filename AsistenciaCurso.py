@@ -52,8 +52,7 @@ def get_config_data():
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
-                        df[col] = (pd.to_datetime(df[col], utc=True, errors='coerce')
-                                   .dt.tz_convert(None)
+                        df[col] = (pd.to_datetime(df[col], dayfirst=True, errors='coerce')
                                    .dt.normalize())
 
                 df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')
