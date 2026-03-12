@@ -183,7 +183,9 @@ def get_cursos_con_sesion_hoy(df_cursos):
             inicio = curso.get('fecha_inicio')
             fin = curso.get('fecha_fin')
             if pd.notna(inicio) and pd.notna(fin):
-                if pd.to_datetime(inicio).normalize() <= hoy <= pd.to_datetime(fin).normalize():
+                inicio_d = pd.to_datetime(inicio, dayfirst=True).date()
+                fin_d = pd.to_datetime(fin, dayfirst=True).date()
+                if inicio_d <= hoy.date() <= fin_d:
                     curso_dict = curso.to_dict()
                     curso_dict['sesion_hoy'] = 1
                     curso_dict['fecha_sesion_hoy'] = inicio
