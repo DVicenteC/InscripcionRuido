@@ -281,6 +281,11 @@ def main():
 
     st.sidebar.divider()
 
+    # Botón para limpiar cache (útil si se actualizaron datos en Sheets)
+    if st.sidebar.button("🔄 Actualizar datos"):
+        st.cache_data.clear()
+        st.rerun()
+
     # ==================== MODO PARTICIPANTE (SIN PASSWORD) ====================
 
     if not admin_mode:
