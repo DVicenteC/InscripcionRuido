@@ -49,7 +49,7 @@ def get_config_data():
             df = pd.DataFrame(data['cursos'])
             if not df.empty:
                 # Convertir columnas de fecha a datetime (detectando formato automáticamente)
-                date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
+                date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
                         df[col] = (pd.to_datetime(df[col], dayfirst=True, errors='coerce')
@@ -154,18 +154,28 @@ def get_cursos_con_sesion_hoy(df_cursos):
     cursos_hoy = []
 
     for _, curso in df_cursos.iterrows():
-        # Verificar cada sesión
-        for sesion_num in [1, 2, 3]:
-            fecha_col = f'fecha_sesion_{sesion_num}'
-            if fecha_col in curso and pd.notna(curso[fecha_col]):
-                fecha_sesion = pd.to_datetime(curso[fecha_col]).normalize()
-                if fecha_sesion == hoy:
-                    # Crear una copia del curso con info de la sesión
-                    curso_dict = curso.to_dict()
-                    curso_dict['sesion_hoy'] = sesion_num
-                    curso_dict['fecha_sesion_hoy'] = curso[fecha_col]
-                    cursos_hoy.append(curso_dict)
-                    break  # Solo tomar la primera sesión del día
+        encontrado = False
+        # Verificar fecha_jornada (cursos de sesión única)
+        if not encontrado and 'fecha_jornada' in curso and pd.notna(curso['fecha_jornada']):
+            fecha_sesion = pd.to_datetime(curso['fecha_jornada']).normalize()
+            if fecha_sesion == hoy:
+                curso_dict = curso.to_dict()
+                curso_dict['sesion_hoy'] = 1
+                curso_dict['fecha_sesion_hoy'] = curso['fecha_jornada']
+                cursos_hoy.append(curso_dict)
+                encontrado = True
+        # Verificar fecha_sesion_1/2/3 (cursos multi-sesión)
+        if not encontrado:
+            for sesion_num in [1, 2, 3]:
+                fecha_col = f'fecha_sesion_{sesion_num}'
+                if fecha_col in curso and pd.notna(curso[fecha_col]):
+                    fecha_sesion = pd.to_datetime(curso[fecha_col]).normalize()
+                    if fecha_sesion == hoy:
+                        curso_dict = curso.to_dict()
+                        curso_dict['sesion_hoy'] = sesion_num
+                        curso_dict['fecha_sesion_hoy'] = curso[fecha_col]
+                        cursos_hoy.append(curso_dict)
+                        break
 
     if cursos_hoy:
         return pd.DataFrame(cursos_hoy)
