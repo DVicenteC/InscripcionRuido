@@ -24,6 +24,8 @@ import requests
 from datetime import datetime, date
 from rut_chile import rut_chile
 import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 # Importar el sistema de buffer
 from db_buffer import get_buffer
@@ -52,8 +54,10 @@ def get_config_data():
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
-                        parsed = pd.to_datetime(df[col], utc=True, errors='coerce')
-                        df[col] = parsed.dt.tz_convert(None).dt.normalize()
+                        parsed = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
+                        if parsed.dt.tz is not None:
+                            parsed = parsed.dt.tz_convert(None)
+                        df[col] = parsed.dt.normalize()
 
                 df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')
             return df
@@ -222,6 +226,92 @@ def validar_participante_inscrito(rut, curso_id, df_registros):
         return True, participante.iloc[0].to_dict()
     else:
         return False, None
+
+# ==================== GENERACIÓN DE REPORTES EXCEL ====================
+
+def _split_rut(rut_str):
+    partes = str(rut_str).strip().upper().split('-')
+    return (partes[0].replace('.', ''), partes[1]) if len(partes) == 2 else (rut_str, '')
+
+def _sexo_codigo(sexo):
+    return 1 if str(sexo).upper() == 'HOMBRE' else 2
+
+def _nac_codigo(nac):
+    return 1 if str(nac).upper() == 'CHILENO' else 2
+
+_ROL_MK = {'PROFESIONAL SST': 1, 'TRABAJADOR': 2, 'MIEMBRO DE COMITÉ PARITARIO': 3,
+            'MIEMBRO COMITE PARITARIO': 3, 'MONITOR O DELEGADO': 4, 'DIRIGENTE SINDICAL': 5}
+
+def generar_excel_ist(df):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Campos inscripción ISTeduca"
+    headers = ["RUT trabajador (Sin puntos ni dv)", "DV", "Nombres", "Apellidos (ambos)",
+               "Email (individual)", "Género", "Rol trabajador", "Región", "Comuna",
+               "Rut empresa (Sin puntos, con guión)", "Razón social"]
+    hf = Font(name="Arial", bold=True, color="FFFFFF", size=10)
+    hfill = PatternFill("solid", fgColor="1F4E79")
+    thin = Side(style='thin', color="AAAAAA")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.font = hf; cell.fill = hfill
+        cell.alignment = Alignment(horizontal="center", wrap_text=True)
+        cell.border = brd
+    ws.row_dimensions[1].height = 30
+    for c, w in enumerate([22,6,25,30,30,10,25,30,25,28,35], 1):
+        ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = w
+    df_ = Font(name="Arial", size=10)
+    for ri, row in enumerate(df.itertuples(index=False), 2):
+        rb, dv = _split_rut(getattr(row, 'rut', ''))
+        ap = f"{getattr(row,'apellido_paterno','')} {getattr(row,'apellido_materno','')}".strip()
+        for c, v in enumerate([rb, dv, getattr(row,'nombres',''), ap,
+            getattr(row,'email',''), getattr(row,'sexo',''), getattr(row,'rol',''),
+            getattr(row,'region',''), getattr(row,'comuna',''),
+            getattr(row,'rut_empresa',''), getattr(row,'razon_social','')], 1):
+            cell = ws.cell(row=ri, column=c, value=v)
+            cell.font = df_; cell.border = brd
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return buf
+
+def generar_excel_mk(df):
+    wb = Workbook()
+    ws = wb.active; ws.title = "Datos"
+    headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
+               "Sexo","Nacionalidad","Rol Trabajador","Otro Rol"]
+    hf = Font(name="Arial", bold=True, color="FFFFFF", size=10)
+    hfill = PatternFill("solid", fgColor="2E75B6")
+    thin = Side(style='thin', color="AAAAAA")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.font = hf; cell.fill = hfill
+        cell.alignment = Alignment(horizontal="center"); cell.border = brd
+    for c, w in enumerate([18,25,25,25,8,14,16,25], 1):
+        ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = w
+    df_ = Font(name="Arial", size=10)
+    for ri, row in enumerate(df.itertuples(index=False), 2):
+        rol = str(getattr(row,'rol','')).upper()
+        rc = _ROL_MK.get(rol, 2)
+        otro = rol if rol not in _ROL_MK else ''
+        for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
+            getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
+            _sexo_codigo(getattr(row,'sexo','')), _nac_codigo(getattr(row,'nacionalidad','')),
+            rc, otro], 1):
+            cell = ws.cell(row=ri, column=c, value=v)
+            cell.font = df_; cell.border = brd
+    for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
+                      ("Largo máximo nombres",50),("Largo máximo apellido paterno",50),
+                      ("Largo máximo apellido materno",50)]),
+                     ("MaeSexo",[("Codigo","Valor"),(1,"Hombre"),(2,"Mujer")]),
+                     ("MaeNacionalidad",[("Codigo","Valor"),(1,"Chileno"),(2,"Extranjero")]),
+                     ("MaeRolTrabajador",[("Codigo","Valor"),(1,"Profesional SST"),(2,"Trabajador"),
+                      (3,"Miembro Comité Paritario"),(4,"Monitor o Delegado"),(5,"Dirigente Sindical")])]:
+        ws2 = wb.create_sheet(sh)
+        for r in rows: ws2.append(r)
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return buf
+
 
 # ==================== INTERFAZ PRINCIPAL ====================
 
@@ -466,7 +556,7 @@ def main():
                         use_container_width=True
                     )
 
-                    # Botón para exportar
+                    # Botón para exportar CSV
                     csv = df_asist.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         "📥 Descargar CSV",
@@ -474,6 +564,36 @@ def main():
                         f"asistencias_{curso_ver}_sesion_{sesion_ver}.csv",
                         "text/csv"
                     )
+
+                    # Descargar Reportes Excel
+                    st.divider()
+                    st.subheader("📥 Descargar Reportes")
+                    df_reg_rep = get_registros_data()
+                    if not df_reg_rep.empty and 'rut' in df_reg_rep.columns and 'curso_id' in df_reg_rep.columns:
+                        ruts_asist = df_asist['rut'].str.upper().str.strip().unique()
+                        df_reg_c = df_reg_rep[df_reg_rep['curso_id'] == curso_ver].copy()
+                        df_reg_c['rut_norm'] = df_reg_c['rut'].astype(str).str.upper().str.strip()
+                        df_asistentes = df_reg_c[df_reg_c['rut_norm'].isin(ruts_asist)].copy()
+                        if df_asistentes.empty:
+                            st.info("ℹ️ No hay asistentes con datos de inscripción para exportar.")
+                        else:
+                            col_r1, col_r2 = st.columns(2)
+                            with col_r1:
+                                st.markdown("**Formato IST Educa**")
+                                st.download_button(
+                                    label="📥 Descargar IST Educa (.xlsx)",
+                                    data=generar_excel_ist(df_asistentes),
+                                    file_name=f"IST_{curso_ver}_s{sesion_ver}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
+                            with col_r2:
+                                st.markdown("**Formato MK Capacitaciones**")
+                                st.download_button(
+                                    label="📥 Descargar MK Capacitaciones (.xlsx)",
+                                    data=generar_excel_mk(df_asistentes),
+                                    file_name=f"MK_{curso_ver}_s{sesion_ver}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
                 else:
                     st.info("ℹ️ No hay asistencias registradas para este curso y sesión")
 

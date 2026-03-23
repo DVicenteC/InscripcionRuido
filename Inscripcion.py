@@ -424,7 +424,10 @@ try:
         if 'fecha_fin' in df_cursos.columns:
             # Convertir ambas fechas a la misma zona horaria (sin timezone)
             df_cursos_copia = df_cursos.copy()
-            df_cursos_copia['fecha_fin'] = pd.to_datetime(df_cursos_copia['fecha_fin']).dt.tz_localize(None)
+            fecha_fin_parsed = pd.to_datetime(df_cursos_copia['fecha_fin'], dayfirst=True, errors='coerce')
+            if fecha_fin_parsed.dt.tz is not None:
+                fecha_fin_parsed = fecha_fin_parsed.dt.tz_convert(None)
+            df_cursos_copia['fecha_fin'] = fecha_fin_parsed.dt.normalize()
             # Filtrar cursos donde la fecha_fin sea mayor o igual a hoy
             df_cursos_disponibles = df_cursos_copia[df_cursos_copia['fecha_fin'] >= hoy].copy()
         else:
