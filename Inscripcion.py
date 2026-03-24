@@ -16,8 +16,15 @@ SECRET_PASSWORD = st.secrets["SECRET_PASSWORD"]
 API_URL = st.secrets["API_URL"]  # URL del Apps Script publicado como aplicación web
 API_KEY = st.secrets["API_KEY"]  # Clave API configurada en el Apps Script
 
+def _rut_valido(rut_str):
+    """Valida RUT sin lanzar excepción para entradas no numéricas."""
+    try:
+        return bool(rut_chile.is_valid_rut(str(rut_str).strip()))
+    except Exception:
+        return False
+
 # Listas para formulario
-ROLES = ["TRABAJADOR", "PROFESIONAL SST", "MIEMBRO DE COMITÉ PARITARIO", 
+ROLES = ["TRABAJADOR", "PROFESIONAL SST", "MIEMBRO DE COMITÉ PARITARIO",
          "MONITOR O DELEGADO", "DIRIGENTE SINDICAL", "EMPLEADOR", 
          "TRABAJADOR DEL OA", "OTROS"]
 SEXO =['MUJER','HOMBRE']
@@ -599,10 +606,10 @@ try:
                     elif not all([rut, nombres, apellido_paterno, nacionalidad, email,
                                  rut_empresa, razon_social, region, comuna, direccion]):
                         st.error("Complete todos los campos obligatorios")
-                    elif not rut_chile.is_valid_rut(rut):
-                        st.error("RUT personal inválido")
-                    elif not rut_chile.is_valid_rut(rut_empresa):
-                        st.error("RUT empresa inválido")
+                    elif not _rut_valido(rut):
+                        st.error("RUT personal inválido. Formato esperado: 12345678-9")
+                    elif not _rut_valido(rut_empresa):
+                        st.error("RUT empresa inválido. Formato esperado: 12345678-9 (sin puntos, con guión)")
                     elif '@' not in email or '.' not in email:
                         st.error("Correo electrónico inválido")
                     else:
