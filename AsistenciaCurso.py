@@ -274,11 +274,12 @@ def generar_excel_ist(df):
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     return buf
 
-def generar_excel_mk(df):
+def generar_excel_mk(df, fecha_sesion=None):
     wb = Workbook()
     ws = wb.active; ws.title = "Datos"
     headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
-               "Sexo","Nacionalidad","Rol Trabajador","Otro Rol"]
+               "Sexo","Nacionalidad","Rol Trabajador","Otro Rol",
+               "Rut empresa (Sin puntos, con guión)", "Razón social", "Comuna", "Fecha 1"]
     hf = Font(name="Arial", bold=True, color="FFFFFF", size=10)
     hfill = PatternFill("solid", fgColor="2E75B6")
     thin = Side(style='thin', color="AAAAAA")
@@ -287,17 +288,24 @@ def generar_excel_mk(df):
         cell = ws.cell(row=1, column=c, value=h)
         cell.font = hf; cell.fill = hfill
         cell.alignment = Alignment(horizontal="center"); cell.border = brd
-    for c, w in enumerate([18,25,25,25,8,14,16,25], 1):
+    for c, w in enumerate([18,25,25,25,8,14,16,25,28,35,25,20], 1):
         ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = w
     df_ = Font(name="Arial", size=10)
     for ri, row in enumerate(df.itertuples(index=False), 2):
         rol = str(getattr(row,'rol','')).upper()
         rc = _ROL_MK.get(rol, 2)
         otro = rol if rol not in _ROL_MK else ''
+        
+        # Obtener datos adicionales
+        re = getattr(row, 'rut_empresa', '')
+        rs = getattr(row, 'razon_social', '')
+        co = getattr(row, 'comuna', '')
+        fe = fecha_sesion if fecha_sesion else ''
+        
         for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
             getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
             _sexo_codigo(getattr(row,'sexo','')), _nac_codigo(getattr(row,'nacionalidad','')),
-            rc, otro], 1):
+            rc, otro, re, rs, co, fe], 1):
             cell = ws.cell(row=ri, column=c, value=v)
             cell.font = df_; cell.border = brd
     for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
@@ -588,9 +596,24 @@ def main():
                                 )
                             with col_r2:
                                 st.markdown("**Formato MK Capacitaciones**")
+                                # Obtener fecha de la sesión para el Excel
+                                curso_info = df_cursos[df_cursos['curso_id'] == curso_ver].iloc[0]
+                                fecha_col = f'fecha_sesion_{sesion_ver}'
+                                if fecha_col not in curso_info or pd.isna(curso_info[fecha_col]):
+                                    # Fallback a fecha_jornada o fecha_inicio si no hay sesión específica
+                                    fecha_sesion = curso_info.get('fecha_jornada', curso_info.get('fecha_inicio', ''))
+                                else:
+                                    fecha_sesion = curso_info[fecha_col]
+                                
+                                # Convertir fecha a string dd-mm-yyyy
+                                if hasattr(fecha_sesion, 'strftime'):
+                                    fecha_sesion_str = fecha_sesion.strftime('%d-%m-%Y')
+                                else:
+                                    fecha_sesion_str = str(fecha_sesion)
+
                                 st.download_button(
                                     label="📥 Descargar MK Capacitaciones (.xlsx)",
-                                    data=generar_excel_mk(df_asistentes),
+                                    data=generar_excel_mk(df_asistentes, fecha_sesion=fecha_sesion_str),
                                     file_name=f"MK_{curso_ver}_s{sesion_ver}.xlsx",
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 )
