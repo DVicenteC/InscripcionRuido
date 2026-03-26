@@ -241,6 +241,8 @@ def _nac_codigo(nac):
 
 _ROL_MK = {'PROFESIONAL SST': 1, 'TRABAJADOR': 2, 'MIEMBRO DE COMITÉ PARITARIO': 3,
             'MIEMBRO COMITE PARITARIO': 3, 'MONITOR O DELEGADO': 4, 'DIRIGENTE SINDICAL': 5}
+_ROL_MK_DISPLAY = {1: "Profesional SST", 2: "Trabajador", 3: "Miembro Comité Paritario",
+                   4: "Monitor o Delegado", 5: "Dirigente Sindical"}
 
 def generar_excel_ist(df):
     wb = Workbook()
@@ -302,10 +304,12 @@ def generar_excel_mk(df, fecha_sesion=None):
         co = getattr(row, 'comuna', '')
         fe = fecha_sesion if fecha_sesion else ''
         
+        sexo_txt = str(getattr(row,'sexo','')).capitalize()
+        nac_txt  = str(getattr(row,'nacionalidad','')).capitalize()
+        rol_txt  = _ROL_MK_DISPLAY.get(rc, rol.capitalize())
         for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
             getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
-            _sexo_codigo(getattr(row,'sexo','')), _nac_codigo(getattr(row,'nacionalidad','')),
-            rc, otro, re, rs, co, fe], 1):
+            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, fe], 1):
             cell = ws.cell(row=ri, column=c, value=v)
             cell.font = df_; cell.border = brd
     for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
