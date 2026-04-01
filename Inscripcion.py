@@ -280,11 +280,7 @@ try:
         st.sidebar.subheader("Crear Nuevo Curso")
 
         # Selector de región para el nuevo curso
-        region_curso = st.sidebar.selectbox(
-            "Región del Curso (*)",
-            regiones,
-            key="region_nuevo_curso"
-        )
+        # Cursos ahora son de carácter online (sesión única)
 
         # Mapeo de regiones a códigos cortos
         region_codigo_map = {
@@ -306,23 +302,26 @@ try:
             "Región de Magallanes y de la Antártica Chilena": "MAG"
         }
 
-        fecha_inicio = st.sidebar.date_input("Fecha de Inicio")
-        fecha_fin = st.sidebar.date_input("Fecha de Término")
+        # Default date provided by user: April 16, 2026
+        default_date = datetime(2026, 4, 16).date()
+        
+        fecha_inicio = st.sidebar.date_input("Fecha de Inicio", value=default_date)
+        fecha_fin = st.sidebar.date_input("Fecha de Término", value=default_date)
 
         # Fecha de la jornada única
         fecha_jornada = st.sidebar.date_input("Fecha de la Jornada (*)",
+                                              value=default_date,
                                               help="Fecha en que se realizará la jornada de 90-120 minutos")
 
-        # Generar ID automáticamente en formato: CódigoRegión-MesAño
+        # Generar ID automáticamente en formato: TMERT-MesAño
         meses_esp = {
             1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
             7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
         }
         mes_nombre = meses_esp[fecha_inicio.month]
         anio_corto = str(fecha_inicio.year)[2:]  # Últimos 2 dígitos del año
-        codigo_region = region_codigo_map.get(region_curso, "OTR")
-
-        curso_id_generado = f"{codigo_region}-{mes_nombre}{anio_corto}"
+        
+        curso_id_generado = f"TMERT-{mes_nombre}{anio_corto}"
 
         # Mostrar ID generado (editable por si necesitan ajustarlo)
         curso_id = st.sidebar.text_input(
@@ -340,10 +339,10 @@ try:
             elif fecha_fin < fecha_inicio:
                 st.sidebar.error("⚠️ La fecha de término no puede ser anterior a la fecha de inicio")
             else:
-                # Crear objeto de curso con región
+                # Crear objeto de curso (Carácter ONLINE)
                 nuevo_curso = {
                     'curso_id': str(curso_id),
-                    'region': region_curso,
+                    'region': 'ONLINE',
                     'fecha_inicio': fecha_inicio.strftime('%d-%m-%Y'),
                     'fecha_fin': fecha_fin.strftime('%d-%m-%Y'),
                     'fecha_jornada': fecha_jornada.strftime('%d-%m-%Y'),
@@ -417,7 +416,7 @@ try:
 
     # Mostrar formulario de inscripción
     try:
-        st.title("Inscripción Jornada de Difusión sobre el Nuevo Protocolo de Ruido ISP (Res. Ex. Nº 5.921) - Empresas Adherentes de IST")
+        st.title("Inscripción Jornada de Difusión del PROTOCOLO DE VIGILANCIA OCUPACIONAL POR EXPOSICIÓN A FACTORES DE RIESGO DE TRASTORNOS MUSCULOESQUELÉTICOS V3")
 
         # Obtener todos los cursos
         df_cursos = get_config_data()
@@ -445,70 +444,39 @@ try:
             st.warning("No hay cursos disponibles para inscripción. Todos los cursos han finalizado.")
             st.stop()
 
-        # Paso 1: Seleccionar región del curso
-        st.subheader("1. Seleccione la región del curso")
+        # Paso 1: Seleccione el curso
+        st.subheader("1. Seleccione el curso")
 
-        # Obtener regiones con cursos disponibles
-        if 'region' in df_cursos_disponibles.columns:
-            regiones_con_cursos = df_cursos_disponibles['region'].unique().tolist()
-            regiones_disponibles = [r for r in regiones if r in regiones_con_cursos]
-        else:
-            regiones_disponibles = regiones
+        # Listar todos los cursos vigentes
+        cursos_disponibles = df_cursos_disponibles
 
-        if not regiones_disponibles:
-            st.warning("No hay cursos disponibles en ninguna región.")
-            st.stop()
-
-        region_curso_seleccionada = st.selectbox(
-            "Región del curso (*)",
-            regiones_disponibles,
-            key='region_curso_inscripcion',
-            placeholder="Seleccione una región..."
-        )
-
-        # Paso 2: Seleccionar curso de esa región
-        if region_curso_seleccionada:
-            if 'region' in df_cursos_disponibles.columns:
-                cursos_region = df_cursos_disponibles[df_cursos_disponibles['region'] == region_curso_seleccionada]
-            else:
-                cursos_region = df_cursos_disponibles
-
-            if cursos_region.empty:
-                st.warning(f"No hay cursos disponibles en {region_curso_seleccionada}.")
-                st.stop()
-
-            st.subheader("2. Seleccione el curso")
-
+        if not cursos_disponibles.empty:
             # Crear lista de cursos con información útil
             opciones_cursos = []
-            for _, curso in cursos_region.iterrows():
-                curso_info = f"{curso['curso_id']}"
+            for _, curso in cursos_disponibles.iterrows():
+                # Formatear fecha para la lista
+                f_jornada = formato_fecha_dd_mm_yyyy(curso.get('fecha_jornada', ''))
+                curso_info = f"{curso['curso_id']} (Jornada: {f_jornada})"
                 opciones_cursos.append(curso_info)
 
             curso_seleccionado_info = st.selectbox(
                 "Curso (*)",
                 opciones_cursos,
-                key='curso_seleccionado_inscripcion'
+                key='curso_seleccionado_inscripcion',
+                placeholder="Seleccione un curso..."
             )
 
             # Obtener el curso seleccionado
             idx_curso = opciones_cursos.index(curso_seleccionado_info)
-            curso_actual = cursos_region.iloc[idx_curso].to_dict()
+            curso_actual = cursos_disponibles.iloc[idx_curso].to_dict()
 
             # Mostrar información del curso seleccionado
             st.info(f"**Curso seleccionado:** {curso_actual['curso_id']}")
             st.write(f"**Período:** {formato_fecha_dd_mm_yyyy(curso_actual['fecha_inicio'])} - {formato_fecha_dd_mm_yyyy(curso_actual['fecha_fin'])}")
 
-            # Mostrar fechas de sesiones si están disponibles
-            if 'fecha_sesion_1' in curso_actual:
-                st.write("**Fechas de Sesiones:**")
-                col_s1, col_s2, col_s3 = st.columns(3)
-                with col_s1:
-                    st.write(f"📅 Sesión 1: {formato_fecha_dd_mm_yyyy(curso_actual['fecha_sesion_1'])}")
-                with col_s2:
-                    st.write(f"📅 Sesión 2: {formato_fecha_dd_mm_yyyy(curso_actual['fecha_sesion_2'])}")
-                with col_s3:
-                    st.write(f"📅 Sesión 3: {formato_fecha_dd_mm_yyyy(curso_actual['fecha_sesion_3'])}")
+            # Mostrar fecha de la jornada
+            if 'fecha_jornada' in curso_actual and pd.notna(curso_actual['fecha_jornada']):
+                st.write(f"📅 **Fecha de la Jornada:** {formato_fecha_dd_mm_yyyy(curso_actual['fecha_jornada'])}")
 
             # Verificar cupos disponibles
             df_registros = get_registros_data()
@@ -534,8 +502,8 @@ try:
 
             st.divider()
 
-            # Paso 3: Formulario de inscripción
-            st.subheader("3. Complete sus datos")
+            # Paso 2: Formulario de inscripción
+            st.subheader("2. Complete sus datos")
 
             # Región y comuna del participante (puede ser diferente a la del curso)
             st.write("**Datos de ubicación del participante:**")

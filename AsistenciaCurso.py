@@ -169,18 +169,14 @@ def get_cursos_con_sesion_hoy(df_cursos):
                 cursos_hoy.append(curso_dict)
                 encontrado = True
 
-        # 2. Verificar fecha_sesion_1/2/3 (cursos multi-sesión)
-        if not encontrado:
-            for sesion_num in [1, 2, 3]:
-                fecha_col = f'fecha_sesion_{sesion_num}'
-                if fecha_col in curso and pd.notna(curso[fecha_col]):
-                    if pd.to_datetime(curso[fecha_col]).date() == hoy_d:
-                        curso_dict = curso.to_dict()
-                        curso_dict['sesion_hoy'] = sesion_num
-                        curso_dict['fecha_sesion_hoy'] = curso[fecha_col]
-                        cursos_hoy.append(curso_dict)
-                        encontrado = True
-                        break
+        # 2. Verificar hoy vs fecha_jornada (SESIÓN ÚNICA)
+        if 'fecha_jornada' in curso and pd.notna(curso['fecha_jornada']):
+            if pd.to_datetime(curso['fecha_jornada']).date() == hoy_d:
+                curso_dict = curso.to_dict()
+                curso_dict['sesion_hoy'] = 1
+                curso_dict['fecha_sesion_hoy'] = curso['fecha_jornada']
+                cursos_hoy.append(curso_dict)
+                encontrado = True
 
         # 3. Fallback: hoy está dentro del rango fecha_inicio – fecha_fin
         if not encontrado:
@@ -328,7 +324,7 @@ def generar_excel_mk(df, fecha_sesion=None):
 # ==================== INTERFAZ PRINCIPAL ====================
 
 def main():
-    st.title("📋 Registro de Asistencia - Jornada de Difusión sobre el Nuevo Protocolo de Ruido ISP (Res. Ex. Nº 5.921) - Empresas Adherentes de IST")
+    st.title("📋 Registro de Asistencia - Jornada de Difusión TMERT V3 (Protocolo de Vigilancia Ocupacional TMERT)")
 
     # Obtener instancia del buffer
     buffer = get_buffer()
@@ -478,61 +474,49 @@ def main():
                 # Obtener info del curso
                 curso = df_cursos[df_cursos['curso_id'] == curso_seleccionado].iloc[0]
 
-                # Mostrar sesiones disponibles
-                sesiones = []
-                for i in [1, 2, 3]:
-                    if f'fecha_sesion_{i}' in curso and pd.notna(curso[f'fecha_sesion_{i}']):
-                        sesiones.append(i)
-                # Fallback: fecha_jornada o fecha_inicio cuentan como sesión 1
-                if not sesiones:
-                    if ('fecha_jornada' in curso and pd.notna(curso['fecha_jornada'])) or \
-                       ('fecha_inicio' in curso and pd.notna(curso['fecha_inicio'])):
-                        sesiones = [1]
+                # Sesión única establecida por defecto
+                sesion_seleccionada = 1
+                st.info("📌 Sesión única de difusión")
 
-                if not sesiones:
-                    st.warning("⚠️ Este curso no tiene sesiones configuradas")
-                else:
-                    sesion_seleccionada = st.selectbox("Selecciona sesión", sesiones)
+                # Formulario de registro
+                with st.form("form_admin"):
+                    col1, col2 = st.columns(2)
 
-                    # Formulario de registro
-                    with st.form("form_admin"):
-                        col1, col2 = st.columns(2)
+                    with col1:
+                        rut = st.text_input("RUT", placeholder="12345678-9")
 
-                        with col1:
-                            rut = st.text_input("RUT", placeholder="12345678-9")
+                    with col2:
+                        estado = st.selectbox("Estado", ["presente", "ausente", "justificado"])
 
-                        with col2:
-                            estado = st.selectbox("Estado", ["presente", "ausente", "justificado"])
+                    submit = st.form_submit_button("💾 Registrar")
 
-                        submit = st.form_submit_button("💾 Registrar")
+                    if submit and rut:
+                        if not rut_chile.is_valid_rut(rut):
+                            st.error("❌ RUT inválido")
+                        else:
+                            # Verificar inscripción
+                            df_registros = get_registros_data()
+                            esta_inscrito, datos = validar_participante_inscrito(
+                                rut, curso_seleccionado, df_registros
+                            )
 
-                        if submit and rut:
-                            if not rut_chile.is_valid_rut(rut):
-                                st.error("❌ RUT inválido")
+                            if not esta_inscrito:
+                                st.error("❌ Participante no inscrito en este curso")
                             else:
-                                # Verificar inscripción
-                                df_registros = get_registros_data()
-                                esta_inscrito, datos = validar_participante_inscrito(
-                                    rut, curso_seleccionado, df_registros
+                                # Marcar en buffer
+                                resultado = buffer.marcar_asistencia(
+                                    curso_id=curso_seleccionado,
+                                    rut=rut,
+                                    sesion=sesion_seleccionada,
+                                    estado=estado,
+                                    metodo='admin_manual'
                                 )
 
-                                if not esta_inscrito:
-                                    st.error("❌ Participante no inscrito en este curso")
+                                if resultado['success']:
+                                    nombre_completo = f"{datos.get('nombres', '')} {datos.get('apellido_paterno', '')}".strip() or rut
+                                    st.success(f"✅ Asistencia registrada para {nombre_completo}")
                                 else:
-                                    # Marcar en buffer
-                                    resultado = buffer.marcar_asistencia(
-                                        curso_id=curso_seleccionado,
-                                        rut=rut,
-                                        sesion=sesion_seleccionada,
-                                        estado=estado,
-                                        metodo='admin_manual'
-                                    )
-
-                                    if resultado['success']:
-                                        nombre_completo = f"{datos.get('nombres', '')} {datos.get('apellido_paterno', '')}".strip() or rut
-                                        st.success(f"✅ Asistencia registrada para {nombre_completo}")
-                                    else:
-                                        st.error(f"❌ {resultado['message']}")
+                                    st.error(f"❌ {resultado['message']}")
 
         # TAB 2: Ver Asistencias
         with tab2:
@@ -544,7 +528,8 @@ def main():
                 curso_ids = df_cursos['curso_id'].tolist()
                 curso_ver = st.selectbox("Curso", curso_ids, key="ver_curso")
 
-                sesion_ver = st.selectbox("Sesión", [1, 2, 3], key="ver_sesion")
+                # Para TMERT es sesión única
+                sesion_ver = 1
 
                 # Obtener asistencias desde el buffer
                 df_asist = get_asistencias_from_buffer(curso_ver, sesion_ver)
