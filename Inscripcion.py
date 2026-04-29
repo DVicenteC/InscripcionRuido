@@ -613,6 +613,11 @@ try:
                                                     key='razon_social_input',
                                                     help="Si no recuerda el RUT, busque por nombre").upper().strip()
 
+            # Verificar que el maestro esté cargado
+            _maestro_check = load_maestro()
+            if _maestro_check.is_empty():
+                st.error("❌ Maestro de adherentes no disponible. Configure `MAESTRO_URL` en los secrets o coloque `maestro_adherentes.parquet` junto a la app.")
+
             sucursales_df = buscar_sucursales(rut_empresa_input, razon_social_input)
             sucursal_sel = None
             if not sucursales_df.is_empty():
