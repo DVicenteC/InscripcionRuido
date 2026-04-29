@@ -610,28 +610,23 @@ try:
             region = st.selectbox("Región del participante (*)", regiones, key='region', on_change=update_comunas_state)
             comuna = st.selectbox("Comuna (*)", st.session_state.get('comunas', []), key='comuna')
 
-            # === Búsqueda reactiva de empresa y centro de trabajo (FUERA del form) ===
+            # === Búsqueda de empresa (selectbox único, soporta búsqueda por nombre o RUT) ===
             st.write("**Empresa y centro de trabajo:**")
-            colE1, colE2 = st.columns(2)
-            with colE1:
-                rut_empresa_input = st.text_input("RUT Empresa", key='rut_empresa_input',
-                                                   help="Si conoce el RUT, ingréselo (formato 12345678-9)").upper().strip()
-            with colE2:
-                empresas_list = listar_empresas()
-                empresa_seleccionada = st.selectbox(
-                    "Razón Social",
-                    options=empresas_list,
-                    index=None,
-                    placeholder="Escriba para buscar la empresa…",
-                    key='empresa_selectbox',
-                    help=f"{len(empresas_list):,} empresas disponibles. Use cualquiera de los dos campos."
-                )
-            # Si seleccionó del selectbox, extraer razón social exacta y RUT
+            empresas_list = listar_empresas()
+            empresa_seleccionada = st.selectbox(
+                "Empresa (*)",
+                options=empresas_list,
+                index=None,
+                placeholder="Escriba el nombre o el RUT de la empresa…",
+                key='empresa_selectbox',
+                help=f"{len(empresas_list):,} empresas disponibles. Puede buscar por nombre o por RUT."
+            )
             razon_social_input = ""
+            rut_empresa_input = ""
             if empresa_seleccionada:
-                razon_social_input, rut_from_select = empresa_seleccionada.rsplit(" — ", 1)
-                if not rut_empresa_input:
-                    rut_empresa_input = rut_from_select.strip().upper()
+                razon_social_input, rut_empresa_input = empresa_seleccionada.rsplit(" — ", 1)
+                rut_empresa_input = rut_empresa_input.strip().upper()
+                st.caption(f"RUT detectado: **{rut_empresa_input}**")
 
             # Verificar que el maestro esté cargado
             _maestro_check = load_maestro()
