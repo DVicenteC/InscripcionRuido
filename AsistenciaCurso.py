@@ -300,7 +300,7 @@ def generar_excel_mk(df, fecha_sesion=None):
     ws = wb.active; ws.title = "Datos"
     headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
                "Sexo","Nacionalidad","Rol Trabajador","Otro Rol",
-               "Rut empresa (Sin puntos, con guión)", "Razón social", "Comuna", "Fecha 1"]
+               "Rut empresa (Sin puntos, con guión)", "Razón social", "Comuna", "Direccion", "Fecha 1"]
     hf = Font(name="Arial", bold=True, color="FFFFFF", size=10)
     hfill = PatternFill("solid", fgColor="2E75B6")
     thin = Side(style='thin', color="AAAAAA")
@@ -309,7 +309,7 @@ def generar_excel_mk(df, fecha_sesion=None):
         cell = ws.cell(row=1, column=c, value=h)
         cell.font = hf; cell.fill = hfill
         cell.alignment = Alignment(horizontal="center"); cell.border = brd
-    for c, w in enumerate([18,25,25,25,8,14,16,25,28,35,25,20], 1):
+    for c, w in enumerate([18,25,25,25,8,14,16,25,28,35,25,35,20], 1):
         ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = w
     df_ = Font(name="Arial", size=10)
     for ri, row in enumerate(df.itertuples(index=False), 2):
@@ -321,6 +321,7 @@ def generar_excel_mk(df, fecha_sesion=None):
         re = getattr(row, 'rut_empresa', '')
         rs = getattr(row, 'razon_social', '')
         co = getattr(row, 'comuna', '')
+        di = getattr(row, 'direccion', '')
         fe = fecha_sesion if fecha_sesion else ''
         
         sexo_txt = str(getattr(row,'sexo','')).capitalize()
@@ -328,7 +329,7 @@ def generar_excel_mk(df, fecha_sesion=None):
         rol_txt  = _ROL_MK_DISPLAY.get(rc, rol.capitalize())
         for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
             getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
-            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, fe], 1):
+            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, di, fe], 1):
             cell = ws.cell(row=ri, column=c, value=v)
             cell.font = df_; cell.border = brd
     for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
