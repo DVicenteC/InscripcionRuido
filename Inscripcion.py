@@ -54,7 +54,7 @@ def _norm_rut(r: str) -> str:
     except Exception: return str(r).upper().strip()
 
 def buscar_sucursales(rut_empresa: str = "", razon_social: str = "") -> pl.DataFrame:
-    """Devuelve sucursales que matchean por RUT (preferente) o por razón social."""
+    """Devuelve sucursales que matchean por RUT (preferente) o por razón social exacta."""
     df = load_maestro()
     if df.is_empty(): return df
     if rut_empresa and _rut_valido(rut_empresa):
@@ -62,10 +62,18 @@ def buscar_sucursales(rut_empresa: str = "", razon_social: str = "") -> pl.DataF
         out = df.with_columns(pl.col('Rut Empresa').map_elements(_norm_rut, return_dtype=pl.Utf8).alias('_rut_n')) \
                 .filter(pl.col('_rut_n') == rut_n).drop('_rut_n')
         if not out.is_empty(): return out
-    if razon_social and len(razon_social.strip()) >= 3:
-        rs = razon_social.strip().upper()
-        return df.filter(pl.col('Razón Social').str.to_uppercase().str.contains(rs, literal=True))
+    if razon_social:
+        return df.filter(pl.col('Razón Social') == razon_social)
     return pl.DataFrame()
+
+@st.cache_data(show_spinner=False)
+def listar_empresas() -> list[str]:
+    """Lista única ordenada de 'RAZON SOCIAL — RUT' para selectbox."""
+    df = load_maestro()
+    if df.is_empty(): return []
+    pdf = df.select(['Razón Social', 'Rut Empresa']).unique().to_pandas()
+    pdf = pdf.dropna(subset=['Razón Social']).sort_values('Razón Social')
+    return [f"{r['Razón Social']} — {r['Rut Empresa']}" for _, r in pdf.iterrows()]
 
 def _rut_valido(rut_str):
     """Valida RUT sin lanzar excepción para entradas no numéricas."""
@@ -606,12 +614,24 @@ try:
             st.write("**Empresa y centro de trabajo:**")
             colE1, colE2 = st.columns(2)
             with colE1:
-                rut_empresa_input = st.text_input("RUT Empresa (*)", key='rut_empresa_input',
-                                                   help="Formato: 12345678-9").upper().strip()
+                rut_empresa_input = st.text_input("RUT Empresa", key='rut_empresa_input',
+                                                   help="Si conoce el RUT, ingréselo (formato 12345678-9)").upper().strip()
             with colE2:
-                razon_social_input = st.text_input("Razón Social (búsqueda parcial)",
-                                                    key='razon_social_input',
-                                                    help="Si no recuerda el RUT, busque por nombre").upper().strip()
+                empresas_list = listar_empresas()
+                empresa_seleccionada = st.selectbox(
+                    "Razón Social",
+                    options=empresas_list,
+                    index=None,
+                    placeholder="Escriba para buscar la empresa…",
+                    key='empresa_selectbox',
+                    help=f"{len(empresas_list):,} empresas disponibles. Use cualquiera de los dos campos."
+                )
+            # Si seleccionó del selectbox, extraer razón social exacta y RUT
+            razon_social_input = ""
+            if empresa_seleccionada:
+                razon_social_input, rut_from_select = empresa_seleccionada.rsplit(" — ", 1)
+                if not rut_empresa_input:
+                    rut_empresa_input = rut_from_select.strip().upper()
 
             # Verificar que el maestro esté cargado
             _maestro_check = load_maestro()
