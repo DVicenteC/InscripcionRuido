@@ -8,6 +8,59 @@ from datetime import datetime
 from pathlib import Path
 from rut_chile import rut_chile
 import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+_ROL_MK = {'PROFESIONAL SST': 1, 'TRABAJADOR': 2, 'MIEMBRO DE COMITÉ PARITARIO': 3,
+           'MIEMBRO COMITE PARITARIO': 3, 'MONITOR O DELEGADO': 4, 'DIRIGENTE SINDICAL': 5}
+_ROL_MK_DISPLAY = {1: "Profesional SST", 2: "Trabajador", 3: "Miembro Comité Paritario",
+                   4: "Monitor o Delegado", 5: "Dirigente Sindical"}
+
+def generar_excel_mk(df, fecha_sesion=None):
+    wb = Workbook()
+    ws = wb.active; ws.title = "Datos"
+    headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
+               "Sexo","Nacionalidad","Rol Trabajador","Otro Rol",
+               "Rut empresa (Sin puntos, con guión)", "Razón social", "Comuna", "Direccion", "Fecha 1"]
+    hf = Font(name="Arial", bold=True, color="FFFFFF", size=10)
+    hfill = PatternFill("solid", fgColor="2E75B6")
+    thin = Side(style='thin', color="AAAAAA")
+    brd = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.font = hf; cell.fill = hfill
+        cell.alignment = Alignment(horizontal="center"); cell.border = brd
+    for c, w in enumerate([18,25,25,25,8,14,16,25,28,35,25,35,20], 1):
+        ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = w
+    df_ = Font(name="Arial", size=10)
+    for ri, row in enumerate(df.itertuples(index=False), 2):
+        rol = str(getattr(row, 'rol', '')).upper()
+        rc = _ROL_MK.get(rol, 2)
+        otro = rol if rol not in _ROL_MK else ''
+        re_ = getattr(row, 'rut_empresa', '')
+        rs = getattr(row, 'razon_social', '')
+        co = getattr(row, 'comuna', '')
+        di = getattr(row, 'direccion', '')
+        fe = fecha_sesion if fecha_sesion else ''
+        sexo_txt = str(getattr(row, 'sexo', '')).capitalize()
+        nac_txt = str(getattr(row, 'nacionalidad', '')).capitalize()
+        rol_txt = _ROL_MK_DISPLAY.get(rc, rol.capitalize())
+        for c, v in enumerate([getattr(row, 'rut', ''), getattr(row, 'nombres', ''),
+            getattr(row, 'apellido_paterno', ''), getattr(row, 'apellido_materno', ''),
+            sexo_txt, nac_txt, rol_txt, otro, re_, rs, co, di, fe], 1):
+            cell = ws.cell(row=ri, column=c, value=v)
+            cell.font = df_; cell.border = brd
+    for sh, rows in [("Parametros", [("Descripcion", "Valor"), ("Largo máximo Rut", 15),
+                      ("Largo máximo nombres", 50), ("Largo máximo apellido paterno", 50),
+                      ("Largo máximo apellido materno", 50)]),
+                     ("MaeSexo", [("Codigo", "Valor"), (1, "Hombre"), (2, "Mujer")]),
+                     ("MaeNacionalidad", [("Codigo", "Valor"), (1, "Chileno"), (2, "Extranjero")]),
+                     ("MaeRolTrabajador", [("Codigo", "Valor"), (1, "Profesional SST"), (2, "Trabajador"),
+                      (3, "Miembro Comité Paritario"), (4, "Monitor o Delegado"), (5, "Dirigente Sindical")])]:
+        ws2 = wb.create_sheet(sh)
+        for r in rows: ws2.append(r)
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return buf
 
 # Configuración básica
 st.set_page_config(page_title="Inscripción de Participantes", layout="wide")
@@ -47,7 +100,7 @@ def load_maestro() -> pl.DataFrame:
             'C.GLS_NOM_SUC', 'Dirección Suc', 'Comuna Sucursal',
             'Region Sucursal', 'Est Sucursal', 'Tipo suc']
     df = df.select([c for c in cols if c in df.columns])
-    return df.filter(pl.col('Est Sucursal') == 'Si') if 'Est Sucursal' in df.columns else df
+    return df.filter(pl.col('Est Sucursal') == 'Activa') if 'Est Sucursal' in df.columns else df
 
 def _norm_rut(r: str) -> str:
     try: return rut_chile.format_rut_without_dots(str(r)).upper().strip()
@@ -468,6 +521,23 @@ try:
                             data=buffer.getvalue(),
                             file_name=f"registros_curso_{curso_seleccionado_descarga}.xlsx",
                             mime="application/vnd.ms-excel"
+                        )
+
+                        # Determinar fecha del curso para el formato MK
+                        curso_row = df_cursos[df_cursos['curso_id'] == curso_seleccionado_descarga].iloc[0]
+                        fecha_mk = curso_row.get('fecha_jornada', None)
+                        if pd.isna(fecha_mk) or fecha_mk in (None, ''):
+                            fecha_mk = curso_row.get('fecha_inicio', '')
+                        if hasattr(fecha_mk, 'strftime'):
+                            fecha_mk_str = fecha_mk.strftime('%d-%m-%Y')
+                        else:
+                            fecha_mk_str = str(fecha_mk) if fecha_mk else ''
+
+                        st.sidebar.download_button(
+                            label=f"📥 Descargar MK Inscritos ({len(registros_curso)})",
+                            data=generar_excel_mk(registros_curso, fecha_sesion=fecha_mk_str),
+                            file_name=f"MK_inscritos_{curso_seleccionado_descarga}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
                     else:
                         st.sidebar.warning("No hay registros para este curso")
