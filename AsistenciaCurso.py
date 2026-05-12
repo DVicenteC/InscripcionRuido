@@ -301,7 +301,7 @@ def generar_excel_mk(df, fecha_sesion=None):
         fecha_dt = None
     if fecha_dt is not None and fecha_dt.tzinfo is not None:
         fecha_dt = fecha_dt.tz_convert(None)
-    fecha_py = fecha_dt.to_pydatetime() if fecha_dt is not None else None
+    fecha_str = fecha_dt.strftime('%d-%m-%Y') if fecha_dt is not None else ''
     wb = Workbook()
     ws = wb.active; ws.title = "Datos"
     headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
@@ -334,11 +334,11 @@ def generar_excel_mk(df, fecha_sesion=None):
         rol_txt  = _ROL_MK_DISPLAY.get(rc, rol.capitalize())
         for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
             getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
-            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, di, fecha_py], 1):
+            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, di, fecha_str], 1):
             cell = ws.cell(row=ri, column=c, value=v)
             cell.font = df_; cell.border = brd
-            if c == 13 and fecha_py is not None:
-                cell.number_format = 'DD-MM-YYYY'
+            if c == 13:
+                cell.number_format = '@'
     for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
                       ("Largo máximo nombres",50),("Largo máximo apellido paterno",50),
                       ("Largo máximo apellido materno",50)]),
