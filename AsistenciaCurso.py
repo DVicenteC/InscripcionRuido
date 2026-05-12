@@ -50,13 +50,16 @@ def get_config_data():
         if data['success']:
             df = pd.DataFrame(data['cursos'])
             if not df.empty:
-                # Convertir columnas de fecha a datetime (detectando formato automáticamente)
+                # ISO primero (Apps Script devuelve ISO), fallback dayfirst para strings dd-mm-yyyy
                 date_cols = ['fecha_inicio', 'fecha_fin', 'fecha_jornada', 'fecha_sesion_1', 'fecha_sesion_2', 'fecha_sesion_3']
                 for col in date_cols:
                     if col in df.columns:
-                        parsed = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
-                        if parsed.dt.tz is not None:
+                        parsed = pd.to_datetime(df[col], format='ISO8601', errors='coerce', utc=True)
+                        if hasattr(parsed.dt, 'tz_convert'):
                             parsed = parsed.dt.tz_convert(None)
+                        mask = parsed.isna() & df[col].notna()
+                        if mask.any():
+                            parsed.loc[mask] = pd.to_datetime(df.loc[mask, col], dayfirst=True, errors='coerce')
                         df[col] = parsed.dt.normalize()
 
                 df['cupo_maximo'] = pd.to_numeric(df['cupo_maximo'], errors='coerce')
