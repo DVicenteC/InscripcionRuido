@@ -21,6 +21,8 @@ def generar_excel_mk(df, fecha_sesion=None):
     fecha_dt = pd.to_datetime(fecha_sesion, dayfirst=True, errors='coerce') if fecha_sesion else None
     if fecha_dt is not None and pd.isna(fecha_dt):
         fecha_dt = None
+    if fecha_dt is not None and fecha_dt.tzinfo is not None:
+        fecha_dt = fecha_dt.tz_convert(None)
     fecha_py = fecha_dt.to_pydatetime() if fecha_dt is not None else None
 
     wb = Workbook()
