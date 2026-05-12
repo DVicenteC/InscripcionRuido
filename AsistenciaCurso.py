@@ -296,6 +296,10 @@ def generar_excel_ist(df):
     return buf
 
 def generar_excel_mk(df, fecha_sesion=None):
+    fecha_dt = pd.to_datetime(fecha_sesion, dayfirst=True, errors='coerce') if fecha_sesion else None
+    if fecha_dt is not None and pd.isna(fecha_dt):
+        fecha_dt = None
+    fecha_py = fecha_dt.to_pydatetime() if fecha_dt is not None else None
     wb = Workbook()
     ws = wb.active; ws.title = "Datos"
     headers = ["Rut","Nombres","Apellido Paterno","Apellido Materno",
@@ -322,16 +326,17 @@ def generar_excel_mk(df, fecha_sesion=None):
         rs = getattr(row, 'razon_social', '')
         co = getattr(row, 'comuna', '')
         di = getattr(row, 'direccion', '')
-        fe = fecha_sesion if fecha_sesion else ''
-        
+
         sexo_txt = str(getattr(row,'sexo','')).capitalize()
         nac_txt  = str(getattr(row,'nacionalidad','')).capitalize()
         rol_txt  = _ROL_MK_DISPLAY.get(rc, rol.capitalize())
         for c, v in enumerate([getattr(row,'rut',''), getattr(row,'nombres',''),
             getattr(row,'apellido_paterno',''), getattr(row,'apellido_materno',''),
-            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, di, fe], 1):
+            sexo_txt, nac_txt, rol_txt, otro, re, rs, co, di, fecha_py], 1):
             cell = ws.cell(row=ri, column=c, value=v)
             cell.font = df_; cell.border = brd
+            if c == 13 and fecha_py is not None:
+                cell.number_format = 'DD-MM-YYYY'
     for sh, rows in [("Parametros",[("Descripcion","Valor"),("Largo máximo Rut",15),
                       ("Largo máximo nombres",50),("Largo máximo apellido paterno",50),
                       ("Largo máximo apellido materno",50)]),
